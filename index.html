@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Detection with YOLO</title>
+    <style>
+        #videoElement {
+            width: 100%;
+            height: auto;
+        }
+        #alert {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: red;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <video id="videoElement" autoplay></video>
+    <div id="alert">Person Detected!</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script>
+        async function setupCamera() {
+            const video = document.getElementById('videoElement');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve(video);
+                };
+            });
+        }
+
+        async function loadYOLOModel() {
+            // Replace this with the path to your YOLO model in TensorFlow.js format
+            const modelPath = 'path/to/your/yolo/model.json';
+            return await tf.loadGraphModel(modelPath);
+        }
+
+        async function detectPerson(video, model) {
+            const inputTensor = tf.browser.fromPixels(video).expandDims(0).toFloat().div(255);
+            const predictions = await model.executeAsync(inputTensor);
+            
+            const boxes = predictions[0].arraySync();
+            const scores = predictions[1].arraySync();
+            const classes = predictions[2].arraySync();
+            const detectionThreshold = 0.5;
+            
+            let personDetected = false;
+            for (let i = 0; i < scores.length; i++) {
+                if (scores[i] > detectionThreshold && classes[i] === 0) {  // Assuming '0' is the class for person
+                    personDetected = true;
+                    break;
+                }
+            }
+
+            const alert = document.getElementById('alert');
+            if (personDetected) {
+                alert.style.display = 'block';
+            } else {
+                alert.style.display = 'none';
+            }
+
+            tf.dispose(inputTensor);
+            tf.dispose(predictions);
+        }
+
+        async function main() {
+            const video = await setupCamera();
+            const model = await loadYOLOModel();
+            video.play();
+            setInterval(() => detectPerson(video, model), 1000);
+        }
+
+        main();
+    </script>
+</body>
+</html>
